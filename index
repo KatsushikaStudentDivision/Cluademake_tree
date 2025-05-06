@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シンプルスライドショー</title>
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- F-05: ローディング表示 -->
+        <div id="loading" class="hidden">データを読み込み中...</div>
+        
+        <!-- F-06: エラー表示 -->
+        <div id="error-message" class="hidden"></div>
+        
+        <!-- F-01: データ表示 -->
+        <div id="data-display">
+            <div class="data-item">
+                <span class="label">現在のスライド:</span>
+                <span id="slide-display">0</span>
+            </div>
+            <div class="data-item">
+                <span class="label">合計値:</span>
+                <span id="total-value-display">0</span>
+            </div>
+        </div>
+        
+        <!-- F-02: スライド画像表示 -->
+        <div id="slide-container">
+            <img id="current-slide" class="slide-image" src="" alt="スライド画像">
+        </div>
+        
+        <!-- F-09: 管理画面へのリンク -->
+        <div id="admin-link-container">
+            <a href="admin.html" class="admin-link">管理画面</a>
+        </div>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>
