@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スライドショー管理画面</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div id="admin-app">
+        <header>
+            <h1>スライドショー管理画面</h1>
+            <!-- A-10: メイン画面へ戻る -->
+            <button id="home-btn" class="btn">メイン画面へ戻る</button>
+        </header>
+        
+        <!-- A-11: UIフィードバック -->
+        <div id="loader" class="hidden">処理中...</div>
+        <div id="message" class="hidden"></div>
+        
+        <!-- A-01: UI構成 - タブナビゲーション -->
+        <div class="tabs">
+            <button class="tab active" data-tab="basic-settings">基本設定</button>
+            <button class="tab" data-tab="slide-settings">スライド設定</button>
+            <button class="tab" data-tab="image-settings">画像設定</button>
+        </div>
+        
+        <div class="tab-content">
+            <!-- 基本設定タブ -->
+            <div id="basic-settings" class="tab-pane active">
+                <h2>基本設定</h2>
+                
+                <!-- A-02: API URL設定 -->
+                <div class="form-group">
+                    <label for="api-url">Google Apps Script WebアプリURL:</label>
+                    <input type="text" id="api-url" placeholder="https://script.google.com/macros/s/...">
+                    <p class="help-text">Google Apps ScriptをWebアプリとしてデプロイした際のURLを入力してください。</p>
+                </div>
+                
+                <!-- A-09: 接続テスト -->
+                <div class="form-group">
+                    <button id="test-connection-btn" class="btn">接続テスト</button>
+                </div>
+            </div>
+            
+            <!-- スライド設定タブ -->
+            <div id="slide-settings" class="tab-pane">
+                <h2>スライド閾値設定</h2>
+                <p>各スライドを表示するために必要な「Google Form回答の合計値」の閾値を設定します。</p>
+                
+                <!-- A-04: スライド閾値設定 -->
+                <div id="thresholds-container">
+                    <!-- JavaScript で動的に生成 -->
+                </div>
+                
+                <button id="add-threshold-btn" class="btn">閾値を追加</button>
+            </div>
+            
+            <!-- 画像設定タブ -->
+            <div id="image-settings" class="tab-pane">
+                <h2>スライド画像設定</h2>
+                
+                <!-- A-07: 現在の画像設定表示 -->
+                <div id="image-grid">
+                    <!-- JavaScript で動的に生成 -->
+                </div>
+                
+                <!-- A-05, A-06: 画像設定 (URL/ID, アップロード) -->
+                <div class="image-upload-section">
+                    <h3>選択中スライドの画像設定</h3>
+                    <div id="selected-slide-info">スライドを選択してください</div>
+                    
+                    <div class="form-group">
+                        <label for="image-id-url-input">画像URLまたはGoogle DriveファイルID:</label>
+                        <input type="text" id="image-id-url-input" placeholder="https://... または DriveファイルID">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="image-upload-input">または、画像をアップロード:</label>
+                        <input type="file" id="image-upload-input" accept="image/*">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- A-08: 設定の保存 -->
+        <div class="form-actions">
+            <button id="save-settings-btn" class="btn primary">すべての設定を保存</button>
+        </div>
+    </div>
+    
+    <script>
+        // 管理アプリのJavaScriptコードは別ファイルで定義されています
+        // ここでは、admin.js 内のコードを直接埋め込む形で示します
+        
+        /**
+         * スライドショー管理アプリケーション
+         */
+        const adminApp = {
+            // 設定情報
+            config: {
+                apiUrl: '',
+                thresholds: [100, 200, 300],  // デフォルト値
+                images: ['', '', '']          // デフォルト値
+            },
+            
+            // 現在の状態
+            state: {
+                isLoading: false,
+                selectedSlideIndex: -1
+            },
+            
+            // DOM要素への参照
+            elements: {},
+            
+            /**
+             * アプリケーションの初期化
+             */
+            init() {
+                console.log('管理アプリを初期化しています...');
+                
+                // DOM要素への参照を保存
+                this.elements = {
+                    loader: document.getElementById('loader'),
+                    message: document.getElementById('message'),
+                    apiUrlInput: document.getElementById('api-url'),
+                    testConnectionBtn: document.getElementById('test-connection-btn'),
+                    thresholdsContainer: document.getElementById('thresholds-container'),
+                    addThresholdBtn: document.getElementById('add-threshold-btn'),
+                    imageGrid: document.getElementById('image-grid'),
+                    selectedSlideInfo: document.getElementById('selected-slide-info'),
+                    imageIdUrlInput: document.getElementById('image-id-url-input'),
+                    imageUploadInput: document.getElementById('image-upload-input'),
+                    saveSettingsBtn: document.getElementById('save-settings-btn'),
+                    homeBtn: document.getElementById('home-btn'),
+                    tabs: document.querySelectorAll('.tab'),
+                    tabPanes: document.querySelectorAll('.tab-pane')
+                };
+                
+                // イベントリスナーの設定
+                this.setupEventListeners();
+                
+                // APIのURLをローカルストレージから読み込む
+                this.config.apiUrl = localStorage.getItem('slideAppApiUrl') || '';
+                this.elements.apiUrlInput.value = this.config.apiUrl;
+                
+                // 設定情報の読み込み
+                if (this.config.apiUrl) {
+                    this.loadConfig();
+                }
+                
+                // UIの初期化
+                this.renderThresholds();
+                this.renderImageGrid();
+            },
+            
+            /**
+             * イベントリスナーの設定
+             */
+            setupEventListeners() {
+                // タブ切り替え
+                this.elements.tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        this.switchTab(tab.dataset.tab);
+                    });
+                });
+                
+                // 接続テスト
+                this.elements.testConnectionBtn.addEventListener('click', () => {
+                    this.testConnection();
+                });
+                
+                // 閾値追加
+                this.elements.addThresholdBtn.addEventListener('click', () => {
+                    this.addThreshold();
+                });
+                
+                // 設定保存
+                this.elements.saveSettingsBtn.addEventListener('click', () => {
+                    this.saveAllSettings();
+                });
+                
+                // メイン画面へ戻る
+                this.elements.homeBtn.addEventListener('click', () => {
+                    window.location.href = 'index.html';
+                });
+                
+                // 画像アップロード
+                this.elements.imageUploadInput.addEventListener('change', (event) => {
+                    if (this.state.selectedSlideIndex >= 0 && event.target.files.length > 0) {
+                        this.handleImageUpload(event.target.files[0]);
+                    }
+                });
+            },
+            
+            /**
+             * A-01: タブ切り替え
+             */
+            switchTab(tabId) {
+                this.elements.tabs.forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.tab === tabId);
+                });
+                
+                this.elements.tabPanes.forEach(pane => {
+                    pane.classList.toggle('active', pane.id === tabId);
+                });
+            },
+            
+            /**
+             * A-03: 設定情報の読み込み
+             */
+            async loadConfig() {
+                this.showLoading(true);
+                try {
+                    const response = await fetch(`${this.config.apiUrl}?action=getConfig`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        // 設定データを更新
+                        this.config.thresholds = data.thresholds || this.config.thresholds;
+                        this.config.images = data.images || this.config.images;
+                        
+                        // 足りない配列要素を初期化
+                        while (this.config.images.length < this.config.thresholds.length) {
+                            this.config.images.push('');
+                        }
+                        
+                        console.log('設定を読み込みました:', this.config);
+                        this.showMessage('設定を読み込みました', 'success');
+                        
+                        // UIを更新
+                        this.renderThresholds();
+                        this.renderImageGrid();
+                    } else {
+                        throw new Error(data.message || '設定の読み込みに失敗しました');
+                    }
+                } catch (error) {
+                    console.error('設定読み込みエラー:', error);
+                    this.showMessage(`設定の読み込みに失敗しました: ${error.message}`, 'error');
+                } finally {
+                    this.showLoading(false);
+                }
+            },
+            
+            /**
+             * A-04: スライド閾値設定のレンダリング
+             */
+            renderThresholds() {
+                this.elements.thresholdsContainer.innerHTML = '';
+                
+                this.config.thresholds.forEach((threshold, index) => {
+                    const thresholdItem = document.createElement('div');
+                    thresholdItem.className = 'threshold-item';
+                    
+                    thresholdItem.innerHTML = `
+                        <div class="threshold-header">
+                            <span>スライド ${index + 1}</span>
+                            <button class="btn danger remove-threshold" data-index="${index}">削除</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="threshold-${index}">表示閾値:</label>
+                            <input type="number" id="threshold-${index}" class="slide-threshold" 
+                                data-index="${index}" value="${threshold}" min="0">
+                            <p class="help-text">合計値がこの値以上になると、スライド${index + 1}が表示されます。</p>
+                        </div>
+                    `;
+                    
+                    this.elements.thresholdsContainer.appendChild(thresholdItem);
+                });
+                
+                // 削除ボタンのイベントリスナー
+                document.querySelectorAll('.remove-threshold').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        const index = parseInt(event.target.dataset.index);
+                        this.removeThreshold(index);
+                    });
+                });
+                
+                // 値変更のイベントリスナー
+                document.querySelectorAll('.slide-threshold').forEach(input => {
+                    input.addEventListener('change', (event) => {
+                        const index = parseInt(event.target.dataset.index);
+                        this.config.thresholds[index] = parseInt(event.target.value) || 0;
+                    });
+                });
+            },
+            
+            /**
+             * 閾値の追加
+             */
+            addThreshold() {
+                // 最後の閾値より大きい値をデフォルト値とする
+                const lastThreshold = this.config.thresholds.length > 0 
+                    ? this.config.thresholds[this.config.thresholds.length - 1] 
+                    : 0;
+                    
+                this.config.thresholds.push(lastThreshold + 100);
+                this.config.images.push('');
+                
+                this.renderThresholds();
+                this.renderImageGrid();
+                
+                this.showMessage('新しい閾値を追加しました', 'success');
+            },
+            
+            /**
+             * 閾値の削除
+             */
+            removeThreshold(index) {
+                if (index >= 0 && index < this.config.thresholds.length) {
+                    this.config.thresholds.splice(index, 1);
+                    this.config.images.splice(index, 1);
+                    
+                    this.renderThresholds();
+                    this.renderImageGrid();
+                    
+                    // 選択中のスライドが削除された場合、選択をクリア
+                    if (this.state.selectedSlideIndex === index) {
+                        this.selectSlide(-1);
+                    } else if (this.state.selectedSlideIndex > index) {
+                        // 選択中のスライドのインデックスを調整
+                        this.selectSlide(this.state.selectedSlideIndex - 1);
+                    }
+                    
+                    this.showMessage('閾値を削除しました', 'success');
+                }
+            },
+            
+            /**
+             * A-07: 現在の画像設定表示
+             */
+            renderImageGrid() {
+                this.elements.imageGrid.innerHTML = '';
+                
+                this.config.thresholds.forEach((threshold, index) => {
+                    const imageUrl = this.getImageUrl(this.config.images[index]);
+                    
+                    const gridItem = document.createElement('div');
+                    gridItem.className = 'image-grid-item';
+                    gridItem.dataset.index = index;
+                    if (index === this.state.selectedSlideIndex) {
+                        gridItem.classList.add('selected');
+                    }
+                    
+                    gridItem.innerHTML = `
+                        <div class="image-preview ${!imageUrl ? 'empty' : ''}">
+                            ${imageUrl 
+                                ? `<img src="${imageUrl}" alt="スライド ${index + 1}">` 
+                                : '<div class="no-image">画像未設定</div>'}
+                        </div>
+                        <div class="image-info">
+                            <span>スライド ${index + 1}</span>
+                            <span>閾値: ${threshold}</span>
+                        </div>
+                    `;
+                    
+                    this.elements.imageGrid.appendChild(gridItem);
+                });
+                
+                // 画像選択のイベントリスナー
+                document.querySelectorAll('.image-grid-item').forEach(item => {
+                    item.addEventListener('click', (event) => {
+                        const index = parseInt(event.currentTarget.dataset.index);
+                        this.selectSlide(index);
+                    });
+                });
+            },
