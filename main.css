@@ -1,0 +1,141 @@
+/* 全体のリセットとベーススタイル */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+#app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+    min-height: 100vh;
+}
+
+/* ローディング表示スタイル (F-05) */
+#loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 5px;
+    z-index: 100;
+}
+
+/* エラー表示スタイル (F-06) */
+#error-message {
+    background-color: #ffebee;
+    color: #d32f2f;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border-left: 5px solid #d32f2f;
+}
+
+/* データ表示スタイル (F-01) */
+#data-display {
+    display: flex;
+    justify-content: space-between;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.data-item {
+    display: flex;
+    align-items: center;
+}
+
+.label {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+/* スライド表示スタイル (F-02) */
+#slide-container {
+    width: 100%;
+    height: 0;
+    padding-bottom: 56.25%; /* 16:9 アスペクト比 */
+    position: relative;
+    overflow: hidden;
+    background-color: #000;
+    border-radius: 5px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.slide-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* F-03: スライド切替アニメーション */
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* 管理画面リンクスタイル (F-09) */
+#admin-link-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+}
+
+.admin-link {
+    display: inline-block;
+    background-color: #2196f3;
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.admin-link:hover {
+    background-color: #0d8bf2;
+}
+
+/* ユーティリティクラス */
+.hidden {
+    display: none;
+}
+
+/* F-08: レスポンシブデザイン対応 */
+@media (max-width: 768px) {
+    #app {
+        padding: 10px;
+    }
+    
+    #data-display {
+        flex-direction: column;
+    }
+    
+    .data-item {
+        margin-bottom: 5px;
+    }
+    
+    #admin-link-container {
+        position: static;
+        margin-top: 20px;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    #slide-container {
+        padding-bottom: 75%; /* モバイルでは少し高めのアスペクト比 */
+    }
+}
