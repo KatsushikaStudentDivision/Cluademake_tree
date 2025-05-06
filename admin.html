@@ -611,3 +611,297 @@
                         return `https://drive.google.com/uc?export=view&id=${imageIdOrUrl}`;
                     } catch (error) {
                         console.error('画像URL生成エラー:', error);
+                        return '';
+                    }
+                },
+                
+                /**
+                 * A-06: 画像アップロード処理
+                 */
+                async handleImageUpload(file) {
+                    try {
+                        debug('画像アップロード処理を開始...');
+                        
+                        if (this.state.selectedSlideIndex < 0) {
+                            debug('スライドが選択されていません');
+                            this.showMessage('先にスライドを選択してください', 'error');
+                            return;
+                        }
+                        
+                        // 対応フォーマットの確認
+                        const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                        debug(`ファイルタイプ: ${file.type}`);
+                        
+                        if (!validTypes.includes(file.type)) {
+                            debug('対応していないファイル形式');
+                            this.showMessage('対応していない画像形式です。JPEG, PNG, GIFのみアップロード可能です。', 'error');
+                            return;
+                        }
+                        
+                        this.showLoading(true);
+                        
+                        // ファイルをBase64エンコード
+                        debug('ファイルをBase64エンコードします');
+                        const base64Data = await this.readFileAsBase64(file);
+                        
+                        if (!this.config.apiUrl) {
+                            throw new Error('API URLが設定されていません');
+                        }
+                        
+                        // サーバーにアップロード
+                        debug('サーバーに画像をアップロードします');
+                        const response = await fetch(`${this.config.apiUrl}?action=uploadImage`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                imageData: base64Data,
+                                fileName: file.name
+                            })
+                        });
+                        
+                        debug('サーバー応答ステータス:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP エラー! ステータス: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        debug('サーバー応答データ:', data);
+                        
+                        if (data.success) {
+                            // アップロードに成功したら、画像IDを保存
+                            this.config.images[this.state.selectedSlideIndex] = data.imageId;
+                            this.elements.imageIdUrlInput.value = data.imageId;
+                            
+                            debug(`画像IDを保存しました: ${data.imageId}`);
+                            
+                            // 画像グリッドを更新
+                            this.renderImageGrid();
+                            
+                            this.showMessage('画像がアップロードされました', 'success');
+                        } else {
+                            throw new Error(data.message || 'アップロードに失敗しました');
+                        }
+                    } catch (error) {
+                        console.error('画像アップロードエラー:', error);
+                        this.showMessage(`画像のアップロードに失敗しました: ${error.message}`, 'error');
+                    } finally {
+                        // ファイル選択をリセット
+                        if (this.elements.imageUploadInput) {
+                            this.elements.imageUploadInput.value = '';
+                        }
+                        this.showLoading(false);
+                    }
+                },
+                
+                /**
+                 * ファイルをBase64エンコードされた文字列として読み込む
+                 */
+                readFileAsBase64(file) {
+                    return new Promise((resolve, reject) => {
+                        try {
+                            debug(`ファイルを読み込みます: ${file.name}, サイズ: ${file.size}バイト`);
+                            
+                            const reader = new FileReader();
+                            
+                            reader.onload = (event) => {
+                                debug('ファイル読み込み完了');
+                                resolve(event.target.result);
+                            };
+                            
+                            reader.onerror = (error) => {
+                                debug('ファイル読み込みエラー:', error);
+                                reject(error);
+                            };
+                            
+                            reader.readAsDataURL(file);
+                        } catch (error) {
+                            console.error('ファイル読み込みエラー:', error);
+                            reject(error);
+                        }
+                    });
+                },
+                
+                /**
+                 * A-09: 接続テスト
+                 */
+                async testConnection() {
+                    try {
+                        debug('接続テストを開始...');
+                        
+                        const apiUrl = this.elements.apiUrlInput.value.trim();
+                        debug(`API URL: ${apiUrl}`);
+                        
+                        if (!apiUrl) {
+                            debug('API URLが空です');
+                            this.showMessage('API URLを入力してください', 'error');
+                            return;
+                        }
+                        
+                        this.showLoading(true);
+                        
+                        const response = await fetch(`${apiUrl}?action=test`);
+                        debug('接続テスト応答ステータス:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP エラー! ステータス: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        debug('接続テスト応答データ:', data);
+                        
+                        if (data.success) {
+                            debug('接続テスト成功');
+                            this.showMessage(`接続テスト成功！ サーバー時刻: ${data.timestamp}`, 'success');
+                            
+                            // 成功したらAPIのURLを保存
+                            this.config.apiUrl = apiUrl;
+                            try {
+                                localStorage.setItem('slideAppApiUrl', apiUrl);
+                                debug('API URLをローカルストレージに保存しました');
+                            } catch (storageError) {
+                                console.warn('ローカルストレージへの保存に失敗しました:', storageError);
+                            }
+                        } else {
+                            throw new Error(data.message || '接続テストに失敗しました');
+                        }
+                    } catch (error) {
+                        console.error('接続テストエラー:', error);
+                        this.showMessage(`接続テストに失敗しました: ${error.message}`, 'error');
+                    } finally {
+                        this.showLoading(false);
+                    }
+                },
+                
+                /**
+                 * A-08: すべての設定を保存
+                 */
+                async saveAllSettings() {
+                    try {
+                        debug('設定の保存を開始...');
+                        
+                        // API URLをチェック
+                        const apiUrl = this.elements.apiUrlInput.value.trim();
+                        debug(`API URL: ${apiUrl}`);
+                        
+                        if (!apiUrl) {
+                            debug('API URLが空です');
+                            this.showMessage('API URLを入力してください', 'error');
+                            return;
+                        }
+                        
+                        // ローカルストレージにAPI URLを保存
+                        try {
+                            localStorage.setItem('slideAppApiUrl', apiUrl);
+                            debug('API URLをローカルストレージに保存しました');
+                        } catch (storageError) {
+                            console.warn('ローカルストレージへの保存に失敗しました:', storageError);
+                        }
+                        
+                        this.config.apiUrl = apiUrl;
+                        
+                        this.showLoading(true);
+                        
+                        // 設定をサーバーに保存
+                        debug('設定をサーバーに送信します:', this.config);
+                        
+                        // ディープコピーを作成して送信（念のため）
+                        const configToSend = {
+                            thresholds: [...this.config.thresholds],
+                            images: [...this.config.images]
+                        };
+                        
+                        const response = await fetch(`${this.config.apiUrl}?action=saveConfig`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(configToSend)
+                        });
+                        
+                        debug('設定保存応答ステータス:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP エラー! ステータス: ${response.status}`);
+                        }
+                        
+                        const data = await response.json();
+                        debug('設定保存応答データ:', data);
+                        
+                        if (data.success) {
+                            debug('設定の保存に成功しました');
+                            this.showMessage('すべての設定が保存されました', 'success');
+                        } else {
+                            throw new Error(data.message || '設定の保存に失敗しました');
+                        }
+                    } catch (error) {
+                        console.error('設定保存エラー:', error);
+                        this.showMessage(`設定の保存に失敗しました: ${error.message}`, 'error');
+                    } finally {
+                        this.showLoading(false);
+                    }
+                },
+                
+                /**
+                 * A-11: ローディング表示
+                 */
+                showLoading(show) {
+                    try {
+                        debug(`ローディング表示: ${show}`);
+                        
+                        this.state.isLoading = show;
+                        
+                        if (this.elements.loader) {
+                            this.elements.loader.classList.toggle('hidden', !show);
+                        } else {
+                            console.warn('loader要素が見つかりません');
+                        }
+                    } catch (error) {
+                        console.error('ローディング表示エラー:', error);
+                    }
+                },
+                
+                /**
+                 * A-11: メッセージ表示
+                 */
+                showMessage(message, type = 'success') {
+                    try {
+                        debug(`メッセージ表示 (${type}): ${message}`);
+                        
+                        if (!this.elements.message) {
+                            console.warn('message要素が見つかりません');
+                            return;
+                        }
+                        
+                        this.elements.message.textContent = message;
+                        this.elements.message.className = '';  // クラスをリセット
+                        this.elements.message.classList.add(type);
+                        this.elements.message.classList.remove('hidden');
+                        
+                        // 5秒後にメッセージを非表示にする
+                        setTimeout(() => {
+                            if (this.elements.message) {
+                                this.elements.message.classList.add('hidden');
+                                debug('メッセージ表示を非表示にしました');
+                            }
+                        }, 5000);
+                    } catch (error) {
+                        console.error('メッセージ表示エラー:', error);
+                    }
+                }
+            };
+
+            // DOMContentLoadedイベントのコールバック内で直接initを呼び出す
+            adminApp.init();
+            
+            // adminAppをグローバルに公開（デバッグ用）
+            window.adminApp = adminApp;
+            
+            // 初期化が完了したことをユーザーに通知
+            console.log('管理アプリの初期化が完了しました。何か問題がある場合は、ブラウザのコンソールでエラーメッセージを確認してください。');
+        });
+    </script>
+</body>
+</html>
