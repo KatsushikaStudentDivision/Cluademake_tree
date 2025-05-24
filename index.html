@@ -495,15 +495,18 @@
                 <div id="settingsTab" class="tab-content">
                     <div class="form-group">
                         <label for="slideInterval">スライド間隔 (秒):</label>
-                        <input type="number" id="slideInterval" class="form-control" value="3" min="1" max="10">
+                        <input type="number" id="slideInterval" class="form-control" value="3" min="1" max="10" step="0.5">
+                        <small style="color: #718096; margin-top: 5px; display: block;">現在の設定: <span id="currentInterval">3</span>秒</small>
                     </div>
                     
                     <div class="form-group">
                         <label for="mockData">モックデータ (カンマ区切り):</label>
                         <input type="text" id="mockData" class="form-control" value="3,4,12" placeholder="例: 3,4,12">
+                        <small style="color: #718096; margin-top: 5px; display: block;">現在の合計値: <span id="currentTotal">19</span></small>
                     </div>
                     
                     <button id="saveSettings" class="btn btn-success">基本設定を保存</button>
+                    <button id="testSettings" class="btn btn-secondary" style="margin-left: 10px;">設定をテスト</button>
                 </div>
             </div>
         </div>
@@ -637,6 +640,18 @@
                 // 設定保存
                 document.getElementById('saveImages').addEventListener('click', () => this.saveImages());
                 document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
+                document.getElementById('testSettings').addEventListener('click', () => this.testSettings());
+
+                // 設定値の リアルタイム更新
+                document.getElementById('slideInterval').addEventListener('input', (e) => {
+                    document.getElementById('currentInterval').textContent = e.target.value;
+                });
+                
+                document.getElementById('mockData').addEventListener('input', (e) => {
+                    const data = e.target.value.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+                    const total = data.reduce((sum, val) => sum + val, 0);
+                    document.getElementById('currentTotal').textContent = total;
+                });
 
                 // キーボードショートカット
                 document.addEventListener('keydown', (e) => {
@@ -777,10 +792,20 @@
             }
 
             startAutoPlay() {
-                if (this.state.displayableImages.length <= 1) return;
+                if (this.state.displayableImages.length <= 1) {
+                    console.log('自動再生開始できません: 画像が1枚以下');
+                    return;
+                }
+                
+                console.log('自動再生開始:', this.config.slideInterval + 'ms間隔');
                 
                 this.state.isAutoPlay = true;
                 document.getElementById('autoPlayBtn').textContent = '自動再生停止';
+                
+                // 既存のタイマーをクリア
+                if (this.state.autoPlayTimer) {
+                    clearInterval(this.state.autoPlayTimer);
+                }
                 
                 this.state.autoPlayTimer = setInterval(() => {
                     this.nextSlide();
@@ -790,6 +815,8 @@
             }
 
             stopAutoPlay() {
+                console.log('自動再生停止');
+                
                 this.state.isAutoPlay = false;
                 document.getElementById('autoPlayBtn').textContent = '自動再生開始';
                 
@@ -805,7 +832,7 @@
                 this.stopProgressTimer();
                 
                 let elapsed = 0;
-                const interval = 50;
+                const interval = 50; // 50ms間隔で更新
                 
                 this.state.progressTimer = setInterval(() => {
                     elapsed += interval;
@@ -894,19 +921,22 @@
                         </div>
                         <div class="form-group">
                             <label>画像URL:</label>
-                            <input type="url" class="form-control" value="${image.url}" 
+                            <input type="url" class="form-control image-url-input" value="${image.url}" 
                                    placeholder="https://example.com/image.jpg" 
-                                   oninput="app.updateImagePreview(${i}, this.value)">
+                                   oninput="app.updateImagePreview(${i}, this.value)"
+                                   data-index="${i}">
                         </div>
                         <div class="form-group">
                             <label>表示タイトル:</label>
-                            <input type="text" class="form-control" value="${image.title}" 
-                                   placeholder="画像のタイトル" id="title-${i}">
+                            <input type="text" class="form-control image-title-input" value="${image.title}" 
+                                   placeholder="画像のタイトル" id="title-${i}"
+                                   data-index="${i}">
                         </div>
                         <div class="form-group">
                             <label>閾値:</label>
-                            <input type="number" class="form-control" value="${image.threshold}" 
-                                   min="0" placeholder="0" id="threshold-${i}">
+                            <input type="number" class="form-control image-threshold-input" value="${image.threshold}" 
+                                   min="0" placeholder="0" id="threshold-${i}"
+                                   data-index="${i}">
                         </div>
                     `;
                     container.appendChild(imageItem);
