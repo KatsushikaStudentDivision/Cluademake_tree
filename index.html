@@ -793,13 +793,13 @@
                         this.stopAutoPlay();
                         this.showMessage('スライドショーが終了しました', 'success');
                     }
-                    // 最初のスライドに戻る
-                    this.state.currentSlide = 0;
+                    // 最後のスライドで停止（最初に戻らない）
+                    // this.state.currentSlide = 0; // この行を削除
                 } else {
                     this.state.currentSlide = this.state.currentSlide + 1;
+                    slides[this.state.currentSlide].classList.add('active');
                 }
                 
-                slides[this.state.currentSlide].classList.add('active');
                 this.updateProgressBar();
             }
 
@@ -997,11 +997,21 @@
                 const imageContainer = document.getElementById('imageConfig');
                 
                 if (imageContainer) {
-                    imageContainer.addEventListener('input', debounce((e) => {
+                    // 既存のイベントリスナーを削除
+                    imageContainer.removeEventListener('input', this.imageInputHandler);
+                    
+                    // 新しいイベントリスナーを追加
+                    this.imageInputHandler = debounce((e) => {
                         if (e.target.matches('.image-url-input, .image-title-input, .image-threshold-input')) {
+                            console.log('画像フィールド変更検知:', e.target.className);
                             this.autoSaveImages(e.target);
                         }
-                    }, 1500)); // 画像設定は少し長めの遅延
+                    }, 1500);
+                    
+                    imageContainer.addEventListener('input', this.imageInputHandler);
+                    console.log('画像自動保存イベントリスナー設定完了');
+                } else {
+                    console.error('imageConfig要素が見つかりません');
                 }
             }
 
@@ -1053,29 +1063,45 @@
             async autoSaveImages(field) {
                 try {
                     field.classList.add('saving');
+                    console.log('画像自動保存開始...');
                     
                     const images = [];
                     
+                    // より確実な要素取得方法
                     for (let i = 0; i < this.config.maxImages; i++) {
-                        const imageItem = document.querySelector(`#imageConfig .image-item:nth-child(${i + 1})`);
-                        if (!imageItem) continue;
+                        // 各画像アイテムを取得
+                        const imageItems = document.querySelectorAll('#imageConfig .image-item');
+                        const imageItem = imageItems[i];
                         
+                        if (!imageItem) {
+                            console.log(`画像アイテム ${i} が見つかりません`);
+                            images.push({ url: '', title: '', threshold: 0 });
+                            continue;
+                        }
+                        
+                        // 各入力フィールドを取得
                         const urlInput = imageItem.querySelector('.image-url-input');
                         const titleInput = imageItem.querySelector('.image-title-input');
                         const thresholdInput = imageItem.querySelector('.image-threshold-input');
                         
-                        const url = urlInput ? urlInput.value : '';
-                        const title = titleInput ? titleInput.value : '';
+                        const url = urlInput ? urlInput.value.trim() : '';
+                        const title = titleInput ? titleInput.value.trim() : '';
                         const threshold = thresholdInput ? parseInt(thresholdInput.value) || 0 : 0;
                         
                         images.push({ url, title, threshold });
+                        
+                        console.log(`画像 ${i}:`, { url: url.substring(0, 50) + '...', title, threshold });
                     }
                     
                     this.state.images = images;
+                    console.log('更新された画像配列:', images.length, '件');
                     
                     // localStorage使用可能時のみ保存
                     if (this.checkLocalStorageAvailability()) {
                         localStorage.setItem('slideshowImages', JSON.stringify(images));
+                        console.log('localStorage に保存完了');
+                    } else {
+                        console.log('localStorage 使用不可 - メモリ内保存のみ');
                     }
                     
                     this.calculateDisplayableImages();
@@ -1087,6 +1113,7 @@
                     setTimeout(() => field.classList.remove('saved'), 2000);
                     
                     this.showAutoSaveStatus();
+                    console.log('画像自動保存完了');
                     
                     // 画像設定変更後、自動再生を開始（画像が複数ある場合）
                     if (this.state.displayableImages.length > 1 && !this.state.isAutoPlay) {
@@ -1096,7 +1123,7 @@
                 } catch (error) {
                     console.error('画像自動保存エラー:', error);
                     field.classList.remove('saving');
-                    this.showMessage('画像自動保存に失敗しました', 'error');
+                    this.showMessage('画像自動保存に失敗しました: ' + error.message, 'error');
                 }
             }
 
@@ -1264,19 +1291,34 @@
         }
 
         // ===========================================
-        // Google Sheets API連携（実装例）
+        // Google Sheets API連携設定
         // ===========================================
+        
+        // TODO: 実際の値に置き換えてください
+        const GOOGLE_API_CONFIG = {
+            apiKey: 'YOUR_API_KEY_HERE', // Google Cloud ConsoleのAPIキー
+            spreadsheetId: 'YOUR_SPREADSHEET_ID_HERE', // スプレッドシートのID
+            range: 'A:A' // データが入力される列範囲（通常はA列）
+        };
+
+        // Google Sheets API連携（実装例）
         class GoogleSheetsAPI {
-            constructor(apiKey, spreadsheetId, range) {
-                this.apiKey = apiKey;
-                this.spreadsheetId = spreadsheetId;
-                this.range = range;
+            constructor(config) {
+                this.apiKey = config.apiKey;
+                this.spreadsheetId = config.spreadsheetId;
+                this.range = config.range;
                 this.baseUrl = 'https://sheets.googleapis.com/v4/spreadsheets';
             }
 
             // 実際のGoogle Sheets APIからデータを取得
             async fetchData() {
                 try {
+                    // APIキーが設定されていない場合はモックデータを使用
+                    if (!this.apiKey || this.apiKey === 'YOUR_API_KEY_HERE') {
+                        console.log('APIキーが未設定のため、モックデータを使用します');
+                        return null; // モックデータ使用のシグナル
+                    }
+
                     const url = `${this.baseUrl}/${this.spreadsheetId}/values/${this.range}?key=${this.apiKey}`;
                     const response = await fetch(url);
                     
@@ -1288,11 +1330,15 @@
                     
                     // レスポンスの値配列から数値のみを抽出
                     const values = data.values || [];
-                    const numbers = values.flat().map(val => {
-                        const num = parseInt(val);
-                        return isNaN(num) ? 0 : num;
-                    }).filter(num => num > 0);
+                    const numbers = values.flat()
+                        .slice(1) // ヘッダー行をスキップ
+                        .map(val => {
+                            const num = parseInt(val);
+                            return isNaN(num) ? 0 : num;
+                        })
+                        .filter(num => num > 0);
                     
+                    console.log('Google Sheetsから取得したデータ:', numbers);
                     return numbers;
                 } catch (error) {
                     console.error('Google Sheets API エラー:', error);
