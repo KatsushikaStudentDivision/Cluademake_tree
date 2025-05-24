@@ -438,6 +438,7 @@
                 <div class="slide-controls">
                     <button id="prevBtn" class="control-btn">‹</button>
                     <button id="autoPlayBtn" class="control-btn auto-play-btn">自動再生開始</button>
+                    <button id="restartBtn" class="control-btn auto-play-btn" style="display: none;">最初から再生</button>
                     <button id="nextBtn" class="control-btn">›</button>
                 </div>
 
@@ -462,8 +463,7 @@
             <div id="adminSection" class="admin-section">
                 <div class="admin-tabs">
                     <button class="tab-btn active" data-tab="login">ログイン</button>
-                    <button class="tab-btn" data-tab="images">画像設定</button>
-                    <button class="tab-btn" data-tab="settings">基本設定</button>
+                    <button class="tab-btn" data-tab="settings">設定</button>
                 </div>
 
                 <!-- ログインタブ -->
@@ -476,37 +476,51 @@
                     <button id="backToSlideshow" class="btn btn-secondary">スライドショーに戻る</button>
                 </div>
 
-                <!-- 画像設定タブ -->
-                <div id="imagesTab" class="tab-content">
-                    <div class="mock-data">
-                        <h3>📊 モックデータ</h3>
-                        <p><strong>Google Form回答例:</strong> [3, 4, 12] → 合計: 19</p>
-                        <p><small>※実際のAPI連携は後で設定します</small></p>
-                    </div>
-                    
-                    <div class="image-config" id="imageConfig">
-                        <!-- 画像設定項目はJavaScriptで動的生成 -->
-                    </div>
-                    
-                    <button id="saveImages" class="btn btn-success">画像設定を保存</button>
-                </div>
-
-                <!-- 基本設定タブ -->
+                <!-- 統合設定タブ -->
                 <div id="settingsTab" class="tab-content">
-                    <div class="form-group">
-                        <label for="slideInterval">スライド間隔 (秒):</label>
-                        <input type="number" id="slideInterval" class="form-control" value="3" min="1" max="10" step="0.5">
-                        <small style="color: #718096; margin-top: 5px; display: block;">現在の設定: <span id="currentInterval">3</span>秒</small>
+                    <!-- 基本設定セクション -->
+                    <div class="settings-section">
+                        <h3 style="color: #4a5568; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                            ⚙️ 基本設定
+                        </h3>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                            <div class="form-group">
+                                <label for="slideInterval">スライド間隔 (秒):</label>
+                                <input type="number" id="slideInterval" class="form-control auto-save" value="3" min="1" max="10" step="0.5">
+                                <small style="color: #718096; margin-top: 5px; display: block;">現在: <span id="currentInterval">3</span>秒間隔</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="mockData">モックデータ (カンマ区切り):</label>
+                                <input type="text" id="mockData" class="form-control auto-save" value="3,4,12" placeholder="例: 3,4,12">
+                                <small style="color: #718096; margin-top: 5px; display: block;">合計値: <span id="currentTotal">19</span></small>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="mockData">モックデータ (カンマ区切り):</label>
-                        <input type="text" id="mockData" class="form-control" value="3,4,12" placeholder="例: 3,4,12">
-                        <small style="color: #718096; margin-top: 5px; display: block;">現在の合計値: <span id="currentTotal">19</span></small>
+
+                    <!-- 画像設定セクション -->
+                    <div class="settings-section">
+                        <h3 style="color: #4a5568; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                            🖼️ 画像設定
+                            <span style="font-size: 14px; font-weight: normal; color: #718096;">※変更は自動保存されます</span>
+                        </h3>
+                        
+                        <div class="mock-data">
+                            <h4 style="color: #c05621; margin-bottom: 10px;">📊 モックデータ状況</h4>
+                            <p><strong>Google Form回答例:</strong> [3, 4, 12] → 合計: <span id="mockDataTotal">19</span></p>
+                            <p><small>※実際のAPI連携は後で設定します</small></p>
+                        </div>
+                        
+                        <div class="image-config" id="imageConfig">
+                            <!-- 画像設定項目はJavaScriptで動的生成 -->
+                        </div>
                     </div>
-                    
-                    <button id="saveSettings" class="btn btn-success">基本設定を保存</button>
-                    <button id="testSettings" class="btn btn-secondary" style="margin-left: 10px;">設定をテスト</button>
+
+                    <!-- 保存状態表示 -->
+                    <div class="save-status" id="saveStatus" style="position: fixed; top: 20px; right: 20px; background: #48bb78; color: white; padding: 10px 15px; border-radius: 8px; display: none; z-index: 1000;">
+                        ✅ 自動保存完了
+                    </div>
                 </div>
             </div>
         </div>
@@ -550,6 +564,11 @@
                 this.generateImageConfig();
                 this.fetchFormData();
                 this.updateSlideshow();
+                
+                // 自動保存の設定（管理者画面生成後に実行）
+                setTimeout(() => {
+                    this.setupImageAutoSave();
+                }, 100);
                 
                 // デフォルトで自動再生を開始
                 setTimeout(() => {
@@ -624,6 +643,7 @@
                 document.getElementById('prevBtn').addEventListener('click', () => this.previousSlide());
                 document.getElementById('nextBtn').addEventListener('click', () => this.nextSlide());
                 document.getElementById('autoPlayBtn').addEventListener('click', () => this.toggleAutoPlay());
+                document.getElementById('restartBtn').addEventListener('click', () => this.restartSlideshow());
 
                 // 管理者タブ
                 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -637,12 +657,10 @@
                 });
                 document.getElementById('backToSlideshow').addEventListener('click', () => this.toggleAdminMode());
 
-                // 設定保存
-                document.getElementById('saveImages').addEventListener('click', () => this.saveImages());
-                document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
-                document.getElementById('testSettings').addEventListener('click', () => this.testSettings());
+                // 自動保存対応フィールド
+                this.setupAutoSave();
 
-                // 設定値の リアルタイム更新
+                // 設定値のリアルタイム更新
                 document.getElementById('slideInterval').addEventListener('input', (e) => {
                     document.getElementById('currentInterval').textContent = e.target.value;
                 });
@@ -651,6 +669,7 @@
                     const data = e.target.value.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
                     const total = data.reduce((sum, val) => sum + val, 0);
                     document.getElementById('currentTotal').textContent = total;
+                    document.getElementById('mockDataTotal').textContent = total;
                 });
 
                 // キーボードショートカット
@@ -765,9 +784,22 @@
                 const slides = document.querySelectorAll('.slide');
                 slides[this.state.currentSlide].classList.remove('active');
                 
-                this.state.currentSlide = (this.state.currentSlide + 1) % this.state.displayableImages.length;
-                slides[this.state.currentSlide].classList.add('active');
+                // 最後のスライドかチェック
+                const isLastSlide = this.state.currentSlide === this.state.displayableImages.length - 1;
                 
+                if (isLastSlide) {
+                    // 最後のスライドに到達したら自動再生を停止
+                    if (this.state.isAutoPlay) {
+                        this.stopAutoPlay();
+                        this.showMessage('スライドショーが終了しました', 'success');
+                    }
+                    // 最初のスライドに戻る
+                    this.state.currentSlide = 0;
+                } else {
+                    this.state.currentSlide = this.state.currentSlide + 1;
+                }
+                
+                slides[this.state.currentSlide].classList.add('active');
                 this.updateProgressBar();
             }
 
@@ -802,6 +834,10 @@
                 this.state.isAutoPlay = true;
                 document.getElementById('autoPlayBtn').textContent = '自動再生停止';
                 
+                // ボタンの表示を調整
+                document.getElementById('autoPlayBtn').style.display = 'inline-block';
+                document.getElementById('restartBtn').style.display = 'none';
+                
                 // 既存のタイマーをクリア
                 if (this.state.autoPlayTimer) {
                     clearInterval(this.state.autoPlayTimer);
@@ -819,6 +855,19 @@
                 
                 this.state.isAutoPlay = false;
                 document.getElementById('autoPlayBtn').textContent = '自動再生開始';
+                
+                // 最後のスライドで停止した場合は「最初から再生」ボタンを表示
+                const isLastSlide = this.state.currentSlide === this.state.displayableImages.length - 1;
+                const restartBtn = document.getElementById('restartBtn');
+                const autoPlayBtn = document.getElementById('autoPlayBtn');
+                
+                if (isLastSlide && this.state.displayableImages.length > 1) {
+                    autoPlayBtn.style.display = 'none';
+                    restartBtn.style.display = 'inline-block';
+                } else {
+                    autoPlayBtn.style.display = 'inline-block';
+                    restartBtn.style.display = 'none';
+                }
                 
                 if (this.state.autoPlayTimer) {
                     clearInterval(this.state.autoPlayTimer);
@@ -856,8 +905,24 @@
 
             updateProgressBar() {
                 if (!this.state.isAutoPlay) {
+                    // 自動再生していない場合は現在位置を表示
                     const progress = ((this.state.currentSlide + 1) / this.state.displayableImages.length) * 100;
                     document.getElementById('progressBar').style.width = `${progress}%`;
+                }
+            }
+
+            // 手動でスライドショーを最初から再開
+            restartSlideshow() {
+                this.state.currentSlide = 0;
+                const slides = document.querySelectorAll('.slide');
+                slides.forEach((slide, index) => {
+                    slide.classList.toggle('active', index === 0);
+                });
+                
+                this.updateProgressBar();
+                
+                if (this.state.displayableImages.length > 1) {
+                    this.startAutoPlay();
                 }
             }
 
@@ -899,10 +964,149 @@
                 if (password === this.config.password) {
                     this.state.isAdmin = true;
                     this.showMessage('ログインしました', 'success');
-                    this.switchTab('images');
+                    this.switchTab('settings'); // 統合設定タブに切り替え
                     document.getElementById('adminPassword').value = '';
                 } else {
                     this.showMessage('パスワードが正しくありません', 'error');
+                }
+            }
+
+            // ===========================================
+            // 自動保存機能
+            // ===========================================
+            
+            setupAutoSave() {
+                // 自動保存対応フィールドにイベントリスナーを追加
+                const autoSaveFields = document.querySelectorAll('.auto-save');
+                
+                autoSaveFields.forEach(field => {
+                    // 基本設定フィールド
+                    if (field.id === 'slideInterval' || field.id === 'mockData') {
+                        field.addEventListener('input', debounce(() => {
+                            this.autoSaveSettings(field);
+                        }, 1000));
+                    }
+                });
+
+                // 画像設定フィールドの自動保存（動的に生成されるため別途設定）
+                this.setupImageAutoSave();
+            }
+
+            setupImageAutoSave() {
+                // 画像設定フィールドのイベントリスナーを設定
+                const imageContainer = document.getElementById('imageConfig');
+                
+                if (imageContainer) {
+                    imageContainer.addEventListener('input', debounce((e) => {
+                        if (e.target.matches('.image-url-input, .image-title-input, .image-threshold-input')) {
+                            this.autoSaveImages(e.target);
+                        }
+                    }, 1500)); // 画像設定は少し長めの遅延
+                }
+            }
+
+            async autoSaveSettings(field) {
+                try {
+                    field.classList.add('saving');
+                    
+                    const slideInterval = parseFloat(document.getElementById('slideInterval').value) || 3;
+                    const mockData = document.getElementById('mockData').value;
+                    
+                    // 設定を更新
+                    const oldInterval = this.config.slideInterval;
+                    this.config.slideInterval = slideInterval * 1000;
+                    this.config.mockData = mockData;
+                    
+                    // localStorage使用可能時のみ保存
+                    if (this.checkLocalStorageAvailability()) {
+                        const settings = {
+                            slideInterval: this.config.slideInterval,
+                            mockData: this.config.mockData
+                        };
+                        localStorage.setItem('slideshowSettings', JSON.stringify(settings));
+                    }
+                    
+                    // 自動再生中でスピードが変更された場合は再開
+                    if (this.state.isAutoPlay && oldInterval !== this.config.slideInterval) {
+                        this.stopAutoPlay();
+                        setTimeout(() => this.startAutoPlay(), 100);
+                    }
+                    
+                    // モックデータが変更された場合は再計算
+                    if (field.id === 'mockData') {
+                        await this.fetchFormData();
+                    }
+                    
+                    field.classList.remove('saving');
+                    field.classList.add('saved');
+                    setTimeout(() => field.classList.remove('saved'), 2000);
+                    
+                    this.showAutoSaveStatus();
+                    
+                } catch (error) {
+                    console.error('自動保存エラー:', error);
+                    field.classList.remove('saving');
+                    this.showMessage('自動保存に失敗しました', 'error');
+                }
+            }
+
+            async autoSaveImages(field) {
+                try {
+                    field.classList.add('saving');
+                    
+                    const images = [];
+                    
+                    for (let i = 0; i < this.config.maxImages; i++) {
+                        const imageItem = document.querySelector(`#imageConfig .image-item:nth-child(${i + 1})`);
+                        if (!imageItem) continue;
+                        
+                        const urlInput = imageItem.querySelector('.image-url-input');
+                        const titleInput = imageItem.querySelector('.image-title-input');
+                        const thresholdInput = imageItem.querySelector('.image-threshold-input');
+                        
+                        const url = urlInput ? urlInput.value : '';
+                        const title = titleInput ? titleInput.value : '';
+                        const threshold = thresholdInput ? parseInt(thresholdInput.value) || 0 : 0;
+                        
+                        images.push({ url, title, threshold });
+                    }
+                    
+                    this.state.images = images;
+                    
+                    // localStorage使用可能時のみ保存
+                    if (this.checkLocalStorageAvailability()) {
+                        localStorage.setItem('slideshowImages', JSON.stringify(images));
+                    }
+                    
+                    this.calculateDisplayableImages();
+                    this.updateSlideshow();
+                    this.updateStatusInfo();
+                    
+                    field.classList.remove('saving');
+                    field.classList.add('saved');
+                    setTimeout(() => field.classList.remove('saved'), 2000);
+                    
+                    this.showAutoSaveStatus();
+                    
+                    // 画像設定変更後、自動再生を開始（画像が複数ある場合）
+                    if (this.state.displayableImages.length > 1 && !this.state.isAutoPlay) {
+                        setTimeout(() => this.startAutoPlay(), 500);
+                    }
+                    
+                } catch (error) {
+                    console.error('画像自動保存エラー:', error);
+                    field.classList.remove('saving');
+                    this.showMessage('画像自動保存に失敗しました', 'error');
+                }
+            }
+
+            showAutoSaveStatus() {
+                const status = document.getElementById('saveStatus');
+                if (status) {
+                    status.classList.add('show');
+                    setTimeout(() => {
+                        status.classList.remove('show');
+                    }, 2000);
                 }
             }
 
@@ -921,20 +1125,20 @@
                         </div>
                         <div class="form-group">
                             <label>画像URL:</label>
-                            <input type="url" class="form-control image-url-input" value="${image.url}" 
+                            <input type="url" class="form-control image-url-input auto-save" value="${image.url}" 
                                    placeholder="https://example.com/image.jpg" 
                                    oninput="app.updateImagePreview(${i}, this.value)"
                                    data-index="${i}">
                         </div>
                         <div class="form-group">
                             <label>表示タイトル:</label>
-                            <input type="text" class="form-control image-title-input" value="${image.title}" 
+                            <input type="text" class="form-control image-title-input auto-save" value="${image.title}" 
                                    placeholder="画像のタイトル" id="title-${i}"
                                    data-index="${i}">
                         </div>
                         <div class="form-group">
                             <label>閾値:</label>
-                            <input type="number" class="form-control image-threshold-input" value="${image.threshold}" 
+                            <input type="number" class="form-control image-threshold-input auto-save" value="${image.threshold}" 
                                    min="0" placeholder="0" id="threshold-${i}"
                                    data-index="${i}">
                         </div>
@@ -1193,7 +1397,7 @@
             }
         }
 
-        // デバウンス関数（API呼び出しの頻度制限）
+        // デバウンス関数（自動保存の頻度制限）
         function debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
